@@ -1,0 +1,24 @@
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# .NET
+**/bin/
+**/obj/
+
+# Node
+EWalletFront/node_modules/
+EWalletFront/dist/
+EWalletFront/build/
+
+# Logs
+*.log
+
+# Environment files
+.env
+appsettings.Development.json
+
+# OS
+Thumbs.db
+.DS_Store
