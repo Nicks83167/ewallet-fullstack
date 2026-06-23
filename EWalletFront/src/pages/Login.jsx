@@ -4,73 +4,91 @@ import api from '../api/axios';
 import { AuthContext } from '../context/AuthContext';
 
 const Login = () => {
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [form, setForm] = useState({ email: '', password: '' });
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [showPw, setShowPw] = useState(false);
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
+
+  const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
     setLoading(true);
-
     try {
-      const response = await api.post('/auth/login', { email, password });
-      
-      if (!response.data.success) {
-        throw new Error(response.data.errors[0]);
-      }
-
-      // Exact path based on contract: response.data.data
-      const { token, user } = response.data.data;
+      const res = await api.post('/auth/login', form);
+      if (!res.data.success) throw new Error(res.data.errors?.[0] ?? res.data.message);
+      const { token, user } = res.data.data;
       login(user, token);
       navigate('/dashboard');
     } catch (err) {
-      if (err.response?.data?.errors?.length > 0) {
-        setError(err.response.data.errors[0]);
-      } else {
-        setError(err.message || "Network error. Please try again.");
-      }
+      setError(err.response?.data?.message ?? err.message ?? 'Login failed. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="container auth-wrapper">
-      <div className="card">
-        <h2 className="title text-center">Login</h2>
-        {error && <div className="alert alert-error">{error}</div>}
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label className="form-label">Email</label>
-            <input 
-              type="email" 
-              className="form-input" 
-              value={email} 
-              onChange={(e) => setEmail(e.target.value)} 
-              required 
-            />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Password</label>
-            <input 
-              type="password" 
-              className="form-input" 
-              value={password} 
-              onChange={(e) => setPassword(e.target.value)} 
-              required 
-            />
-          </div>
-          <button type="submit" className="btn" style={{ width: '100%' }} disabled={loading}>
-            {loading ? 'Logging in...' : 'Login'}
-          </button>
-        </form>
-        <p className="text-center mt-2">
-          Don't have an account? <Link to="/register" style={{ color: 'var(--primary-color)' }}>Register</Link>
-        </p>
+    <div className="auth-page">
+      <div className="auth-box">
+        <div className="auth-logo">
+          <span>💳</span> EWallet
+        </div>
+        <div className="auth-card">
+          <h1 className="auth-title">Welcome back</h1>
+          <p className="auth-subtitle">Apne account mein sign in karein</p>
+
+          {error && (
+            <div className="alert alert-error">
+              <span>⚠</span> {error}
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit}>
+            <div className="form-group">
+              <label className="form-label">Email address</label>
+              <input
+                type="email"
+                className="form-input"
+                placeholder="rahul@example.com"
+                value={form.email}
+                onChange={set('email')}
+                autoComplete="email"
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label" style={{ display: 'flex', justifyContent: 'space-between' }}>
+                Password
+                <button
+                  type="button"
+                  className="btn-ghost btn-sm"
+                  style={{ padding: 0, fontSize: '0.75rem', color: 'var(--text-3)' }}
+                  onClick={() => setShowPw(v => !v)}
+                >
+                  {showPw ? 'Hide' : 'Show'}
+                </button>
+              </label>
+              <input
+                type={showPw ? 'text' : 'password'}
+                className="form-input"
+                placeholder="••••••••"
+                value={form.password}
+                onChange={set('password')}
+                autoComplete="current-password"
+                required
+              />
+            </div>
+            <button type="submit" className="btn btn-full" disabled={loading} style={{ marginTop: '0.5rem' }}>
+              {loading ? <><span className="spinner" /> Signing in…</> : 'Sign In'}
+            </button>
+          </form>
+        </div>
+        <div className="auth-footer">
+          Don't have an account? <Link to="/register">Create one</Link>
+        </div>
       </div>
     </div>
   );

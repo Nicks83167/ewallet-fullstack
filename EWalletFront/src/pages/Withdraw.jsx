@@ -3,14 +3,13 @@ import api from '../api/axios';
 import { formatCurrency } from '../utils/format';
 import ConfirmModal from '../components/ConfirmModal';
 
-const Transfer = () => {
-  const [form, setForm] = useState({ receiverEmail: '', amount: '', description: '' });
+const Withdraw = () => {
+  const [amount, setAmount] = useState('');
+  const [description, setDescription] = useState('');
   const [balance, setBalance] = useState(null);
   const [status, setStatus] = useState(null);
   const [loading, setLoading] = useState(false);
   const [confirm, setConfirm] = useState(false);
-
-  const set = (field) => (e) => setForm(f => ({ ...f, [field]: e.target.value }));
 
   useEffect(() => {
     api.get('/wallet/balance')
@@ -18,31 +17,28 @@ const Transfer = () => {
       .catch(() => {});
   }, []);
 
-  const parsed = parseFloat(form.amount) || 0;
+  const parsed = parseFloat(amount) || 0;
   const insufficient = balance !== null && parsed > balance;
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!parsed || !form.receiverEmail || insufficient) return;
+    if (!parsed || parsed <= 0 || insufficient) return;
     setConfirm(true);
   };
 
-  const doTransfer = async () => {
+  const doWithdraw = async () => {
     setConfirm(false);
     setStatus(null);
     setLoading(true);
     try {
-      const res = await api.post('/wallet/transfer', {
-        receiverEmail: form.receiverEmail,
-        amount: parsed,
-        description: form.description || undefined
-      });
+      const res = await api.post('/wallet/withdraw', { amount: parsed, description: description || undefined });
       if (!res.data.success) throw new Error(res.data.errors?.[0] ?? res.data.message);
       setBalance(res.data.data.newBalance);
       setStatus({ type: 'success', message: res.data.data.message, ref: res.data.data.transactionId });
-      setForm({ receiverEmail: '', amount: '', description: '' });
+      setAmount('');
+      setDescription('');
     } catch (err) {
-      setStatus({ type: 'error', message: err.response?.data?.message ?? err.message ?? 'Transfer failed.' });
+      setStatus({ type: 'error', message: err.response?.data?.message ?? err.message ?? 'Withdrawal failed.' });
     } finally {
       setLoading(false);
     }
@@ -51,7 +47,7 @@ const Transfer = () => {
   return (
     <div className="page-body">
       <div className="topbar" style={{ marginLeft: '-2.5rem', marginRight: '-2.5rem', marginTop: '-2rem', marginBottom: '2rem', paddingLeft: '2.5rem' }}>
-        <span className="topbar-title">Transfer</span>
+        <span className="topbar-title">Withdraw</span>
       </div>
 
       <div style={{ maxWidth: '520px' }}>
@@ -64,7 +60,7 @@ const Transfer = () => {
 
         <div className="card">
           <div className="section-header">
-            <div className="section-title">Send Money</div>
+            <div className="section-title">Withdraw Funds</div>
           </div>
 
           {status && (
@@ -79,19 +75,6 @@ const Transfer = () => {
 
           <form onSubmit={handleSubmit}>
             <div className="form-group">
-              <label className="form-label">Recipient email</label>
-              <input
-                type="email"
-                className="form-input"
-                placeholder="e.g. priya@example.com"
-                value={form.receiverEmail}
-                onChange={set('receiverEmail')}
-                required
-              />
-              <span className="form-hint">Recipient must have an EWallet account.</span>
-            </div>
-
-            <div className="form-group">
               <label className="form-label">Amount</label>
               <div className="input-prefix">
                 <span className="prefix-symbol">₹</span>
@@ -99,11 +82,11 @@ const Transfer = () => {
                   type="number"
                   step="0.01"
                   min="1"
-                  max="100000"
+                  max={balance ?? 100000}
                   className="form-input"
                   placeholder="0.00"
-                  value={form.amount}
-                  onChange={set('amount')}
+                  value={amount}
+                  onChange={e => setAmount(e.target.value)}
                   required
                 />
               </div>
@@ -113,13 +96,13 @@ const Transfer = () => {
             </div>
 
             <div className="form-group">
-              <label className="form-label">Note <span className="text-muted">(optional)</span></label>
+              <label className="form-label">Description <span className="text-muted">(optional)</span></label>
               <input
                 type="text"
                 className="form-input"
-                placeholder="e.g. Rent, chai paise, dinner split"
-                value={form.description}
-                onChange={set('description')}
+                placeholder="e.g. UPI withdrawal, ATM"
+                value={description}
+                onChange={e => setDescription(e.target.value)}
                 maxLength={200}
               />
             </div>
@@ -127,9 +110,10 @@ const Transfer = () => {
             <button
               type="submit"
               className="btn btn-full"
-              disabled={loading || !parsed || !form.receiverEmail || insufficient}
+              style={{ background: 'var(--danger)' }}
+              disabled={loading || !parsed || insufficient}
             >
-              {loading ? <><span className="spinner" /> Processing…</> : `Send ${parsed ? formatCurrency(parsed) : 'Money'}`}
+              {loading ? <><span className="spinner" /> Processing…</> : `Withdraw ${parsed ? formatCurrency(parsed) : 'Funds'}`}
             </button>
           </form>
         </div>
@@ -137,37 +121,28 @@ const Transfer = () => {
 
       {confirm && (
         <ConfirmModal
-          title="Confirm Transfer"
-          onConfirm={doTransfer}
+          title="Confirm Withdrawal"
+          onConfirm={doWithdraw}
           onCancel={() => setConfirm(false)}
-          confirmLabel="Yes, Send Money"
+          confirmLabel="Yes, Withdraw"
+          confirmClass="btn btn-danger"
         >
-          <p>Please review your transfer details:</p>
+          <p>You are about to withdraw:</p>
           <div className="modal-highlight">
-            <div className="modal-highlight-row">
-              <span>To</span>
-              <strong>{form.receiverEmail}</strong>
-            </div>
             <div className="modal-highlight-row">
               <span>Amount</span>
               <strong className="amount-debit">{formatCurrency(parsed)}</strong>
             </div>
-            {form.description && (
-              <div className="modal-highlight-row">
-                <span>Note</span>
-                <strong>{form.description}</strong>
-              </div>
-            )}
             <div className="modal-highlight-row">
               <span>Balance after</span>
               <strong>{formatCurrency((balance ?? 0) - parsed)}</strong>
             </div>
           </div>
-          <p>Transfers cannot be reversed. Double-check the recipient email.</p>
+          <p>This action cannot be undone.</p>
         </ConfirmModal>
       )}
     </div>
   );
 };
 
-export default Transfer;
+export default Withdraw;

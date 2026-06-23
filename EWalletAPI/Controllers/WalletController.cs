@@ -28,7 +28,6 @@ public class WalletController : ControllerBase
     {
         var userId = ClaimsHelper.GetUserId(User);
         var result = await _walletService.GetBalanceAsync(userId);
-
         return result.Success ? Ok(result) : NotFound(result);
     }
 
@@ -41,15 +40,30 @@ public class WalletController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage);
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
             return BadRequest(ApiResponseDto<object>.Fail("Validation failed.", errors));
         }
 
         var userId = ClaimsHelper.GetUserId(User);
         var result = await _walletService.AddMoneyAsync(userId, request);
+        return result.Success ? Ok(result) : BadRequest(result);
+    }
 
+    /// <summary>Withdraw money from the current user's wallet.</summary>
+    [HttpPost("withdraw")]
+    [ProducesResponseType(typeof(ApiResponseDto<WalletOperationResponseDto>), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ApiResponseDto<object>), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Withdraw([FromBody] WithdrawRequestDto request)
+    {
+        if (!ModelState.IsValid)
+        {
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
+            return BadRequest(ApiResponseDto<object>.Fail("Validation failed.", errors));
+        }
+
+        var userId = ClaimsHelper.GetUserId(User);
+        var result = await _walletService.WithdrawAsync(userId, request);
         return result.Success ? Ok(result) : BadRequest(result);
     }
 
@@ -62,15 +76,12 @@ public class WalletController : ControllerBase
     {
         if (!ModelState.IsValid)
         {
-            var errors = ModelState.Values
-                .SelectMany(v => v.Errors)
-                .Select(e => e.ErrorMessage);
+            var errors = ModelState.Values.SelectMany(v => v.Errors).Select(e => e.ErrorMessage);
             return BadRequest(ApiResponseDto<object>.Fail("Validation failed.", errors));
         }
 
         var userId = ClaimsHelper.GetUserId(User);
         var result = await _walletService.TransferAsync(userId, request);
-
         return result.Success ? Ok(result) : BadRequest(result);
     }
 }

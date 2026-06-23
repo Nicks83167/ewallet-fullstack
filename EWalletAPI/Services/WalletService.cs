@@ -57,19 +57,17 @@ public class WalletService : IWalletService
 
             var refCode = GenerateReferenceCode("DEP");
 
-            // Credit wallet
             wallet.Balance += request.Amount;
             wallet.UpdatedAt = DateTime.UtcNow;
 
-            // Record transaction
             var transaction = new Transaction
             {
-                SenderWalletId = null,               // Deposits have no sender
+                SenderWalletId = null,
                 ReceiverWalletId = wallet.Id,
                 Amount = request.Amount,
                 Type = TransactionType.Deposit,
                 Status = TransactionStatus.Completed,
-                Description = request.Description ?? "Account top-up",
+                Description = string.IsNullOrWhiteSpace(request.Description) ? "Account top-up" : request.Description,
                 ReferenceCode = refCode,
                 CreatedAt = DateTime.UtcNow
             };
@@ -79,7 +77,7 @@ public class WalletService : IWalletService
             await dbTx.CommitAsync();
 
             _logger.LogInformation(
-                "Deposit ₹{Amount} to wallet {WalletId}. Ref: {Ref}",
+                "Deposit {Amount} to wallet {WalletId}. Ref: {Ref}",
                 request.Amount, wallet.Id, refCode);
 
             return ApiResponseDto<WalletOperationResponseDto>.Ok(new WalletOperationResponseDto
@@ -98,12 +96,76 @@ public class WalletService : IWalletService
         }
     }
 
+    // ─── POST Withdraw ────────────────────────────────────────────────────────
+
+    public async Task<ApiResponseDto<WalletOperationResponseDto>> WithdrawAsync(
+        Guid userId, WithdrawRequestDto request)
+    {
+        await using var dbTx = await _db.Database.BeginTransactionAsync();
+        try
+        {
+            var wallet = await _db.Wallets
+                .FirstOrDefaultAsync(w => w.UserId == userId && w.IsActive);
+
+            if (wallet is null)
+            {
+                await dbTx.RollbackAsync();
+                return ApiResponseDto<WalletOperationResponseDto>.Fail("Wallet not found.");
+            }
+
+            if (wallet.Balance < request.Amount)
+            {
+                await dbTx.RollbackAsync();
+                return ApiResponseDto<WalletOperationResponseDto>.Fail(
+                    $"Insufficient balance. Available: ₹{wallet.Balance:F2}, Requested: ₹{request.Amount:F2}");
+            }
+
+            var refCode = GenerateReferenceCode("WDR");
+
+            wallet.Balance -= request.Amount;
+            wallet.UpdatedAt = DateTime.UtcNow;
+
+            var transaction = new Transaction
+            {
+                SenderWalletId = wallet.Id,
+                ReceiverWalletId = null,
+                Amount = request.Amount,
+                Type = TransactionType.Withdrawal,
+                Status = TransactionStatus.Completed,
+                Description = string.IsNullOrWhiteSpace(request.Description) ? "Withdrawal" : request.Description,
+                ReferenceCode = refCode,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _db.Transactions.Add(transaction);
+            await _db.SaveChangesAsync();
+            await dbTx.CommitAsync();
+
+            _logger.LogInformation(
+                "Withdrawal {Amount} from wallet {WalletId}. Ref: {Ref}",
+                request.Amount, wallet.Id, refCode);
+
+            return ApiResponseDto<WalletOperationResponseDto>.Ok(new WalletOperationResponseDto
+            {
+                Success = true,
+                Message = $"₹{request.Amount:F2} withdrawn successfully.",
+                NewBalance = wallet.Balance,
+                TransactionId = refCode
+            });
+        }
+        catch (Exception ex)
+        {
+            await dbTx.RollbackAsync();
+            _logger.LogError(ex, "Error withdrawing from wallet for user {UserId}", userId);
+            throw;
+        }
+    }
+
     // ─── POST Transfer ────────────────────────────────────────────────────────
 
     public async Task<ApiResponseDto<WalletOperationResponseDto>> TransferAsync(
         Guid senderId, TransferRequestDto request)
     {
-        // Prevent self-transfer
         var senderUser = await _db.Users.FindAsync(senderId);
         if (senderUser is null)
             return ApiResponseDto<WalletOperationResponseDto>.Fail("Sender account not found.");
@@ -111,7 +173,6 @@ public class WalletService : IWalletService
         if (senderUser.Email.Equals(request.ReceiverEmail, StringComparison.OrdinalIgnoreCase))
             return ApiResponseDto<WalletOperationResponseDto>.Fail("Cannot transfer to your own wallet.");
 
-        // Look up receiver
         var receiverUser = await _db.Users
             .Include(u => u.Wallet)
             .FirstOrDefaultAsync(u =>
@@ -123,15 +184,20 @@ public class WalletService : IWalletService
         await using var dbTx = await _db.Database.BeginTransactionAsync();
         try
         {
-            // Lock both wallets in a consistent order to prevent deadlocks
-            var walletIds = new[] { senderId, receiverUser.Id }.OrderBy(id => id).ToArray();
+            // Load wallets in a consistent ID order to prevent deadlocks
+            Wallet senderWallet;
+            Wallet receiverWallet;
 
-            // Load sender wallet with row-level lock via PESSIMISTIC read
-            var senderWallet = await _db.Wallets
-                .FirstOrDefaultAsync(w => w.UserId == senderId && w.IsActive);
-
-            var receiverWallet = await _db.Wallets
-                .FirstOrDefaultAsync(w => w.UserId == receiverUser.Id && w.IsActive);
+            if (senderId.CompareTo(receiverUser.Id) < 0)
+            {
+                senderWallet = (await _db.Wallets.FirstOrDefaultAsync(w => w.UserId == senderId && w.IsActive))!;
+                receiverWallet = (await _db.Wallets.FirstOrDefaultAsync(w => w.UserId == receiverUser.Id && w.IsActive))!;
+            }
+            else
+            {
+                receiverWallet = (await _db.Wallets.FirstOrDefaultAsync(w => w.UserId == receiverUser.Id && w.IsActive))!;
+                senderWallet = (await _db.Wallets.FirstOrDefaultAsync(w => w.UserId == senderId && w.IsActive))!;
+            }
 
             if (senderWallet is null)
             {
@@ -145,7 +211,6 @@ public class WalletService : IWalletService
                 return ApiResponseDto<WalletOperationResponseDto>.Fail("Receiver wallet not found.");
             }
 
-            // ── Insufficient balance check ──────────────────────────────────
             if (senderWallet.Balance < request.Amount)
             {
                 await dbTx.RollbackAsync();
@@ -156,14 +221,12 @@ public class WalletService : IWalletService
             var refCode = GenerateReferenceCode("TXN");
             var now = DateTime.UtcNow;
 
-            // ── Atomic Debit / Credit ───────────────────────────────────────
             senderWallet.Balance -= request.Amount;
             senderWallet.UpdatedAt = now;
 
             receiverWallet.Balance += request.Amount;
             receiverWallet.UpdatedAt = now;
 
-            // ── Record transaction ──────────────────────────────────────────
             var transaction = new Transaction
             {
                 SenderWalletId = senderWallet.Id,
@@ -171,7 +234,9 @@ public class WalletService : IWalletService
                 Amount = request.Amount,
                 Type = TransactionType.Transfer,
                 Status = TransactionStatus.Completed,
-                Description = request.Description ?? $"Transfer to {receiverUser.Email}",
+                Description = string.IsNullOrWhiteSpace(request.Description)
+                    ? $"Transfer to {receiverUser.Email}"
+                    : request.Description,
                 ReferenceCode = refCode,
                 CreatedAt = now
             };
@@ -181,7 +246,7 @@ public class WalletService : IWalletService
             await dbTx.CommitAsync();
 
             _logger.LogInformation(
-                "Transfer ₹{Amount} from wallet {Sender} to wallet {Receiver}. Ref: {Ref}",
+                "Transfer {Amount} from wallet {Sender} to wallet {Receiver}. Ref: {Ref}",
                 request.Amount, senderWallet.Id, receiverWallet.Id, refCode);
 
             return ApiResponseDto<WalletOperationResponseDto>.Ok(new WalletOperationResponseDto

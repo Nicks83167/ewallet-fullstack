@@ -49,6 +49,25 @@ public class UserProfileDto
     public DateTime CreatedAt { get; set; }
 }
 
+public class ChangePasswordRequestDto
+{
+    [Required(ErrorMessage = "Current password is required.")]
+    public string CurrentPassword { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "New password is required.")]
+    [MinLength(8, ErrorMessage = "Password must be at least 8 characters.")]
+    [RegularExpression(@"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[\W_]).{8,}$",
+        ErrorMessage = "Password must have uppercase, lowercase, digit, and special character.")]
+    public string NewPassword { get; set; } = string.Empty;
+}
+
+public class UpdateProfileRequestDto
+{
+    [Required(ErrorMessage = "Full name is required.")]
+    [StringLength(100, MinimumLength = 2)]
+    public string FullName { get; set; } = string.Empty;
+}
+
 // ─── Wallet DTOs ────────────────────────────────────────────────────────────
 
 public class WalletBalanceDto
@@ -62,7 +81,17 @@ public class WalletBalanceDto
 public class AddMoneyRequestDto
 {
     [Required]
-    [Range(1, 100000, ErrorMessage = "Amount must be between 1 and 100,000.")]
+    [Range(1, 100000, ErrorMessage = "Amount must be between ₹1 and ₹1,00,000.")]
+    public decimal Amount { get; set; }
+
+    [StringLength(200)]
+    public string? Description { get; set; }
+}
+
+public class WithdrawRequestDto
+{
+    [Required]
+    [Range(1, 100000, ErrorMessage = "Amount must be between ₹1 and ₹1,00,000.")]
     public decimal Amount { get; set; }
 
     [StringLength(200)]
@@ -76,7 +105,7 @@ public class TransferRequestDto
     public string ReceiverEmail { get; set; } = string.Empty;
 
     [Required]
-    [Range(1, 100000, ErrorMessage = "Amount must be between 1 and 100,000.")]
+    [Range(1, 100000, ErrorMessage = "Amount must be between ₹1 and ₹1,00,000.")]
     public decimal Amount { get; set; }
 
     [StringLength(200)]
@@ -101,7 +130,7 @@ public class TransactionDto
     public string Status { get; set; } = string.Empty;
     public string? Description { get; set; }
     public string? ReferenceCode { get; set; }
-    public string Direction { get; set; } = string.Empty; // "Sent" or "Received"
+    public string Direction { get; set; } = string.Empty; // "IN" or "OUT"
     public string? CounterpartyName { get; set; }
     public DateTime CreatedAt { get; set; }
 }

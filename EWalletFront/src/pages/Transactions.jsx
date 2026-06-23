@@ -1,107 +1,124 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api/axios';
+import { formatCurrency, formatDateTime, txBadge, txAmountClass } from '../utils/format';
+
+const TYPE_ICON = { Deposit: '↓', Transfer: '→', Withdrawal: '↑' };
 
 const Transactions = () => {
   const [transactions, setTransactions] = useState([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
   const pageSize = 10;
 
   useEffect(() => {
-    const fetchTransactions = async () => {
+    const load = async () => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get(`/transactions?page=${page}&pageSize=${pageSize}`);
-        
-        if (!response.data.success) {
-          throw new Error(response.data.errors[0]);
-        }
-
-        const data = response.data.data;
-        setTransactions(data.transactions);
-        setTotalPages(data.totalPages);
+        const res = await api.get(`/transactions?page=${page}&pageSize=${pageSize}`);
+        if (!res.data.success) throw new Error(res.data.message);
+        const { transactions: txs, totalPages: tp, totalCount: tc } = res.data.data;
+        setTransactions(txs);
+        setTotalPages(tp);
+        setTotalCount(tc);
       } catch (err) {
-        if (err.response?.data?.errors?.length > 0) {
-          setError(err.response.data.errors[0]);
-        } else {
-          setError("Network error fetching transactions.");
-        }
+        setError(err.response?.data?.message ?? err.message ?? 'Failed to load transactions.');
       } finally {
         setLoading(false);
       }
     };
-
-    fetchTransactions();
+    load();
   }, [page]);
 
+  const from = (page - 1) * pageSize + 1;
+  const to = Math.min(page * pageSize, totalCount);
+
   return (
-    <div className="container mt-2">
+    <div className="page-body">
+      <div className="topbar" style={{ marginLeft: '-2.5rem', marginRight: '-2.5rem', marginTop: '-2rem', marginBottom: '2rem', paddingLeft: '2.5rem' }}>
+        <span className="topbar-title">Transactions</span>
+        {totalCount > 0 && <span className="topbar-badge">{totalCount} total</span>}
+      </div>
+
+      {error && <div className="alert alert-error"><span>⚠</span> {error}</div>}
+
       <div className="card">
-        <h2 className="title">Transaction History</h2>
-        
-        {error && <div className="alert alert-error">{error}</div>}
-        
+        <div className="section-header">
+          <div>
+            <div className="section-title">Transaction History</div>
+            <div className="section-subtitle">All your deposits, withdrawals, and transfers</div>
+          </div>
+        </div>
+
         {loading ? (
-          <p>Loading transactions...</p>
+          <div className="page-loading" style={{ height: '20vh' }}>
+            <div className="spinner" /><span>Loading transactions…</span>
+          </div>
+        ) : transactions.length === 0 ? (
+          <div className="empty-state">
+            <div className="empty-state-icon">📭</div>
+            <p>No transactions found.</p>
+          </div>
         ) : (
           <>
-            <div className="table-container">
-              {transactions.length === 0 ? (
-                <p style={{ color: 'var(--text-secondary)' }}>No transactions found.</p>
-              ) : (
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Ref Code</th>
-                      <th>Date</th>
-                      <th>Type</th>
-                      <th>Description</th>
-                      <th>Counterparty</th>
-                      <th>Amount</th>
-                      <th>Status</th>
+            <div className="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Transaction</th>
+                    <th>Date & Time</th>
+                    <th>Counterparty</th>
+                    <th>Ref Code</th>
+                    <th>Amount</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {transactions.map(tx => (
+                    <tr key={tx.id}>
+                      <td>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <div className={`tx-icon ${tx.direction === 'IN' ? 'in' : 'out'}`}>
+                            {TYPE_ICON[tx.type] ?? (tx.direction === 'IN' ? '↓' : '↑')}
+                          </div>
+                          <div>
+                            <div style={{ fontWeight: 500, color: 'var(--text-1)', fontSize: '0.875rem' }}>{tx.type}</div>
+                            <div className="text-xs text-muted">{tx.direction === 'IN' ? 'Received' : 'Sent'}</div>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="text-sm">{formatDateTime(tx.createdAt)}</td>
+                      <td className="text-sm">{tx.counterpartyName ?? <span className="text-muted">—</span>}</td>
+                      <td><span className="mono text-muted">{tx.referenceCode ?? '—'}</span></td>
+                      <td className={txAmountClass(tx.direction)}>
+                        {tx.direction === 'IN' ? '+' : '−'}{formatCurrency(tx.amount)}
+                      </td>
+                      <td><span className={`badge ${txBadge(tx.status)}`}>{tx.status}</span></td>
                     </tr>
-                  </thead>
-                  <tbody>
-                    {transactions.map(tx => (
-                      <tr key={tx.id}>
-                        <td style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>{tx.referenceCode}</td>
-                        <td>{new Date(tx.createdAt).toLocaleDateString()} {new Date(tx.createdAt).toLocaleTimeString()}</td>
-                        <td>{tx.type}</td>
-                        <td>{tx.description}</td>
-                        <td>{tx.counterpartyName || '-'}</td>
-                        <td className={tx.direction === 'IN' ? 'type-credit' : 'type-debit'}>
-                          {tx.direction === 'IN' ? '+' : '-'}${tx.amount.toFixed(2)}
-                        </td>
-                        <td className={`status-${tx.status.toLowerCase()}`}>{tx.status}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
+                  ))}
+                </tbody>
+              </table>
             </div>
 
-            {totalPages > 1 && (
-              <div className="pagination">
-                <button 
-                  className="btn btn-secondary" 
-                  disabled={page === 1} 
-                  onClick={() => setPage(p => p - 1)}
-                >
-                  Previous
+            <div className="pagination">
+              <span className="pagination-info">
+                {totalCount > 0 ? `Showing ${from}–${to} of ${totalCount}` : ''}
+              </span>
+              <div className="pagination-controls">
+                <button className="btn btn-secondary btn-sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+                  ← Prev
                 </button>
-                <span>Page {page} of {totalPages}</span>
-                <button 
-                  className="btn btn-secondary" 
-                  disabled={page === totalPages} 
-                  onClick={() => setPage(p => p + 1)}
-                >
-                  Next
+                <span className="text-sm text-muted" style={{ padding: '0 0.5rem' }}>
+                  {page} / {totalPages}
+                </span>
+                <button className="btn btn-secondary btn-sm" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>
+                  Next →
                 </button>
               </div>
-            )}
+            </div>
           </>
         )}
       </div>

@@ -24,11 +24,7 @@ var connectionString = builder.Configuration.GetConnectionString("DefaultConnect
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString),
-        mysql =>
-        {
-           // mysql.EnableRetryOnFailure(maxRetryCount: 5, maxRetryDelay: TimeSpan.FromSeconds(10), errorNumbersToAdd: null);
-            mysql.CommandTimeout(30);
-        });
+        mysql => mysql.CommandTimeout(30));
 
     if (builder.Environment.IsDevelopment())
     {
@@ -59,7 +55,7 @@ builder.Services
             ValidIssuer = jwtSettings.Issuer,
             ValidAudience = jwtSettings.Audience,
             IssuerSigningKey = new SymmetricSecurityKey(
-                                           Encoding.UTF8.GetBytes(jwtSettings.SecretKey))
+                Encoding.UTF8.GetBytes(jwtSettings.SecretKey))
         };
         options.Events = new JwtBearerEvents
         {
@@ -89,10 +85,16 @@ builder.Services.AddCors(options =>
     options.AddPolicy("EWalletCorsPolicy", policy =>
     {
         if (builder.Environment.IsDevelopment())
-            policy.AllowAnyOrigin().AllowAnyMethod().AllowAnyHeader();
+            policy.WithOrigins("http://localhost:5173")
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
         else
-            policy.WithOrigins("https://yourdomain.com")
-                  .AllowAnyMethod().AllowAnyHeader().AllowCredentials();
+            policy.WithOrigins(
+                    builder.Configuration["AllowedOrigins"] ?? "https://yourdomain.com")
+                  .AllowAnyMethod()
+                  .AllowAnyHeader()
+                  .AllowCredentials();
     });
 });
 
@@ -144,18 +146,9 @@ builder.Services.AddSwaggerGen(options =>
 });
 
 // ── Build App ─────────────────────────────────────────────────────────────────
-builder.Services.AddCors(options =>
-{
-    options.AddPolicy("AllowReact", policy =>
-    {
-        policy.WithOrigins("http://localhost:5173") // Your React app's URL
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
-});
 var app = builder.Build();
 
-app.UseGlobalExceptionHandler();  // ← must be first
+app.UseGlobalExceptionHandler();
 
 if (app.Environment.IsDevelopment())
 {
@@ -165,7 +158,6 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 app.UseCors("EWalletCorsPolicy");
-app.UseCors("AllowReact");
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();

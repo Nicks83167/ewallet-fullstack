@@ -20,3 +20,9 @@ public enum TransactionStatus
     Failed,
     Reversed
 }
+
+public enum TransactionDirection
+{
+    In,
+    Out
+}

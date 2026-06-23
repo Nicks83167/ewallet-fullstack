@@ -64,7 +64,7 @@ public class TransactionService : ITransactionService
                 Status = t.Status.ToString(),
                 Description = t.Description,
                 ReferenceCode = t.ReferenceCode,
-                Direction = isSender ? "Sent" : "Received",
+                Direction = isSender ? "OUT" : "IN",
                 CounterpartyName = counterparty,
                 CreatedAt = t.CreatedAt
             };
