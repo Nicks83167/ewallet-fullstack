@@ -7,12 +7,19 @@ import ErrorBoundary from './components/ErrorBoundary';
 
 import Login from './pages/Login';
 import Register from './pages/Register';
-import Dashboard from './pages/Dashboard';
+import Dashboard from './pages/DashboardNew';
 import AddMoney from './pages/AddMoney';
 import Withdraw from './pages/Withdraw';
 import Transfer from './pages/Transfer';
 import Transactions from './pages/Transactions';
 import Profile from './pages/Profile';
+import Notifications from './pages/Notifications';
+import LinkedAccounts from './pages/LinkedAccounts';
+import Beneficiaries from './pages/Beneficiaries';
+import Currency from './pages/Currency';
+import QRPayment from './pages/QRPayment';
+import BillPayment from './pages/BillPayment';
+import Recharge from './pages/Recharge';
 
 const AppShell = ({ children }) => {
   const { isAuthenticated } = useContext(AuthContext);
@@ -55,6 +62,27 @@ function App() {
               } />
               <Route path="/profile" element={
                 <ProtectedRoute><Profile /></ProtectedRoute>
+              } />
+              <Route path="/notifications" element={
+                <ProtectedRoute><Notifications /></ProtectedRoute>
+              } />
+              <Route path="/linked-accounts" element={
+                <ProtectedRoute><LinkedAccounts /></ProtectedRoute>
+              } />
+              <Route path="/beneficiaries" element={
+                <ProtectedRoute><Beneficiaries /></ProtectedRoute>
+              } />
+              <Route path="/currency" element={
+                <ProtectedRoute><Currency /></ProtectedRoute>
+              } />
+              <Route path="/qr-payment" element={
+                <ProtectedRoute><QRPayment /></ProtectedRoute>
+              } />
+              <Route path="/bill-payment" element={
+                <ProtectedRoute><BillPayment /></ProtectedRoute>
+              } />
+              <Route path="/recharge" element={
+                <ProtectedRoute><Recharge /></ProtectedRoute>
               } />
             </Routes>
           </AppShell>

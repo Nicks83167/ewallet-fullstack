@@ -103,6 +103,15 @@ builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IAuthService, AuthService>();
 builder.Services.AddScoped<IWalletService, WalletService>();
 builder.Services.AddScoped<ITransactionService, TransactionService>();
+builder.Services.AddScoped<IAnalyticsService, AnalyticsService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<ILinkedAccountService, LinkedAccountService>();
+builder.Services.AddScoped<IBeneficiaryService, BeneficiaryService>();
+builder.Services.AddScoped<ICurrencyService, CurrencyService>();
+builder.Services.AddScoped<IQRPaymentService, QRPaymentService>();
+builder.Services.AddScoped<IBillPaymentService, BillPaymentService>();
+builder.Services.AddScoped<IRechargeService, RechargeService>();
+builder.Services.AddScoped<IScheduledPaymentService, ScheduledPaymentService>();
 
 // ── Controllers + JSON ────────────────────────────────────────────────────────
 builder.Services.AddControllers()

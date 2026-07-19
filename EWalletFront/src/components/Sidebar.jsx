@@ -2,13 +2,49 @@ import React, { useContext } from 'react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 
-const NAV = [
-  { to: '/dashboard',    icon: '⊞',  label: 'Dashboard'    },
-  { to: '/add-money',    icon: '＋',  label: 'Add Money'    },
-  { to: '/withdraw',     icon: '↑',   label: 'Withdraw'     },
-  { to: '/transfer',     icon: '→',   label: 'Transfer'     },
-  { to: '/transactions', icon: '≡',   label: 'Transactions' },
-  { to: '/profile',      icon: '👤',  label: 'Profile'      },
+const NAV_SECTIONS = [
+  {
+    label: 'Main',
+    items: [
+      { to: '/dashboard',          icon: '⊞',  label: 'Dashboard'       },
+      { to: '/transactions',       icon: '≡',   label: 'Transactions'    },
+      { to: '/notifications',      icon: '🔔',  label: 'Notifications'   },
+    ]
+  },
+  {
+    label: 'Money',
+    items: [
+      { to: '/add-money',          icon: '＋',  label: 'Add Money'       },
+      { to: '/withdraw',           icon: '↑',   label: 'Withdraw'        },
+      { to: '/transfer',           icon: '→',   label: 'Transfer'        },
+      { to: '/currency',           icon: '💱',  label: 'Currency'        },
+    ]
+  },
+  {
+    label: 'Payments',
+    items: [
+      { to: '/qr-payment',         icon: '📱',  label: 'QR Payment'      },
+      { to: '/bill-payment',       icon: '💡',  label: 'Bill Payment'    },
+      { to: '/recharge',           icon: '📶',  label: 'Recharge'        },
+      { to: '/merchants',          icon: '🏪',  label: 'Merchants'       },
+    ]
+  },
+  {
+    label: 'Manage',
+    items: [
+      { to: '/linked-accounts',    icon: '🏦',  label: 'Linked Accounts' },
+      { to: '/beneficiaries',      icon: '👥',  label: 'Beneficiaries'   },
+      { to: '/scheduled-payments', icon: '⏰',  label: 'Scheduled'       },
+      { to: '/reports',            icon: '📊',  label: 'Reports'         },
+    ]
+  },
+  {
+    label: 'Account',
+    items: [
+      { to: '/profile',            icon: '👤',  label: 'Profile'         },
+      { to: '/security',           icon: '🔒',  label: 'Security'        },
+    ]
+  },
 ];
 
 const Sidebar = () => {
@@ -34,18 +70,22 @@ const Sidebar = () => {
         </span>
       </div>
 
-      {/* Navigation */}
+      {/* Navigation — scrollable */}
       <nav className="sidebar-nav">
-        <span className="sidebar-section-label">Menu</span>
-        {NAV.map(({ to, icon, label }) => (
-          <NavLink
-            key={to}
-            to={to}
-            className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
-          >
-            <span className="nav-item-icon">{icon}</span>
-            {label}
-          </NavLink>
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.label} className="nav-section">
+            <span className="sidebar-section-label">{section.label}</span>
+            {section.items.map(({ to, icon, label }) => (
+              <NavLink
+                key={to}
+                to={to}
+                className={({ isActive }) => `nav-item${isActive ? ' active' : ''}`}
+              >
+                <span className="nav-item-icon">{icon}</span>
+                {label}
+              </NavLink>
+            ))}
+          </div>
         ))}
       </nav>
 

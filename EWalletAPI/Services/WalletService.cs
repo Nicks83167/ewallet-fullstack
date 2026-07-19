@@ -29,10 +29,14 @@ public class WalletService : IWalletService
         if (wallet is null)
             return ApiResponseDto<WalletBalanceDto>.Fail("Wallet not found.");
 
+        var currency = await _db.Currencies.FirstOrDefaultAsync(c => c.Code == wallet.CurrencyCode);
         return ApiResponseDto<WalletBalanceDto>.Ok(new WalletBalanceDto
         {
             WalletId = wallet.Id,
             Balance = wallet.Balance,
+            CurrencyCode = wallet.CurrencyCode,
+            CurrencySymbol = currency?.Symbol ?? "₹",
+            Status = wallet.Status.ToString(),
             UpdatedAt = wallet.UpdatedAt,
             OwnerName = wallet.User!.FullName
         });
@@ -55,6 +59,12 @@ public class WalletService : IWalletService
                 return ApiResponseDto<WalletOperationResponseDto>.Fail("Wallet not found.");
             }
 
+            if (wallet.Status != WalletStatus.Active)
+            {
+                await dbTx.RollbackAsync();
+                return ApiResponseDto<WalletOperationResponseDto>.Fail("Wallet is frozen or suspended.");
+            }
+
             var refCode = GenerateReferenceCode("DEP");
 
             wallet.Balance += request.Amount;
@@ -69,6 +79,9 @@ public class WalletService : IWalletService
                 Status = TransactionStatus.Completed,
                 Description = string.IsNullOrWhiteSpace(request.Description) ? "Account top-up" : request.Description,
                 ReferenceCode = refCode,
+                CurrencyCode = wallet.CurrencyCode,
+                Category = "Top-up",
+                PaymentMethod = "WalletBalance",
                 CreatedAt = DateTime.UtcNow
             };
 

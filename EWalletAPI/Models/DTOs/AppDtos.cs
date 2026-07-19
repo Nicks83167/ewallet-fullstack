@@ -74,8 +74,12 @@ public class WalletBalanceDto
 {
     public Guid WalletId { get; set; }
     public decimal Balance { get; set; }
+    public string CurrencyCode { get; set; } = "INR";
+    public string CurrencySymbol { get; set; } = "₹";
+    public string Status { get; set; } = "Active";
     public DateTime UpdatedAt { get; set; }
     public string OwnerName { get; set; } = string.Empty;
+    public string? FormattedBalance { get; set; }
 }
 
 public class AddMoneyRequestDto
@@ -152,6 +156,7 @@ public class ApiResponseDto<T>
     public string Message { get; set; } = string.Empty;
     public T? Data { get; set; }
     public IEnumerable<string>? Errors { get; set; }
+    public string? Error { get; set; }
 
     public static ApiResponseDto<T> Ok(T data, string message = "Success") =>
         new() { Success = true, Message = message, Data = data };
