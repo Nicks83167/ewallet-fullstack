@@ -1,266 +1,146 @@
 import React, { useState, useEffect } from 'react';
+import { apiGet, apiPost } from '../utils/api';
+
+const CATEGORIES = [
+  { id: 'Electricity', name: 'Electricity', icon: '💡', providers: ['MSEB', 'BSES', 'TSNPDCL', 'KSEB', 'PSPCL', 'UPPCL', 'WBSEDCL'] },
+  { id: 'Water',       name: 'Water',       icon: '💧', providers: ['BMC Water', 'DJB Water', 'MCGM', 'GHMC Water', 'BWSSB'] },
+  { id: 'Gas',         name: 'Gas',         icon: '🔥', providers: ['Indane Gas', 'Bharat Gas', 'HP Gas', 'Adani Gas'] },
+  { id: 'Broadband',   name: 'Broadband',   icon: '📶', providers: ['Airtel Fiber', 'Jio Fiber', 'BSNL Broadband', 'Hathway', 'ACT Fibernet'] },
+  { id: 'DTH',         name: 'DTH/Cable',   icon: '📺', providers: ['Tata Sky', 'Airtel Digital TV', 'Dish TV', 'Sun Direct', 'D2H'] },
+  { id: 'Insurance',   name: 'Insurance',   icon: '🛡️', providers: ['LIC', 'HDFC Life', 'ICICI Prudential', 'SBI Life', 'Bajaj Allianz'] },
+  { id: 'FASTag',      name: 'FASTag',      icon: '🛣️', providers: ['ICICI FASTag', 'HDFC FASTag', 'Paytm FASTag', 'Airtel FASTag', 'SBI FASTag'] },
+];
 
 const BillPayment = () => {
-  const [activeCategory, setActiveCategory] = useState('Electricity');
-  const [billForm, setBillForm] = useState({
-    category: 'Electricity',
-    provider: '',
-    consumerNumber: '',
-    amount: ''
-  });
-  const [billHistory, setBillHistory] = useState([]);
+  const [activeCat, setActiveCat] = useState('Electricity');
+  const [form, setForm] = useState({ provider: '', consumerNumber: '', amount: '' });
+  const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
-  const billCategories = [
-    { id: 'Electricity', name: 'Electricity', icon: '💡', providers: ['MSEB', 'BSES', 'TSNPDCL', 'KSEB', 'PSPCL'] },
-    { id: 'Water', name: 'Water', icon: '💧', providers: ['BMC Water', 'DJB Water', 'MCGM', 'GHMC Water'] },
-    { id: 'Gas', name: 'Gas', icon: '🔥', providers: ['Indane Gas', 'Bharat Gas', 'HP Gas', 'Reliance Gas'] },
-    { id: 'Broadband', name: 'Broadband', icon: '📶', providers: ['Airtel Fiber', 'Jio Fiber', 'BSNL', 'Hathway', 'ACT'] },
-    { id: 'DTH', name: 'DTH/Cable', icon: '📺', providers: ['Tata Sky', 'Airtel Digital TV', 'Dish TV', 'Sun Direct'] },
-    { id: 'Insurance', name: 'Insurance', icon: '🛡️', providers: ['LIC', 'HDFC Life', 'ICICI Prudential', 'SBI Life'] },
-    { id: 'FASTag', name: 'FASTag', icon: '🛣️', providers: ['ICICI FASTag', 'HDFC FASTag', 'Paytm FASTag', 'Airtel FASTag'] }
-  ];
+  useEffect(() => { fetchHistory(); }, []);
+  useEffect(() => { setForm({ provider: '', consumerNumber: '', amount: '' }); }, [activeCat]);
 
-  useEffect(() => {
-    fetchBillHistory();
-  }, []);
-
-  useEffect(() => {
-    setBillForm({...billForm, category: activeCategory, provider: ''});
-  }, [activeCategory]);
-
-  const fetchBillHistory = async () => {
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/BillPayment?page=1&pageSize=20', {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const data = await response.json();
-      
-      if (data.success) {
-        setBillHistory(data.data.items);
-      }
-    } catch (err) {
-      console.error('Failed to fetch bill history');
-    }
+  const fetchHistory = async () => {
+    const data = await apiGet('/api/BillPayment?page=1&pageSize=20');
+    if (data.success) setHistory(data.data?.items ?? []);
   };
 
-  const handlePayBill = async (e) => {
-    e.preventDefault();
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const token = localStorage.getItem('authToken');
-      const response = await fetch('/api/BillPayment/pay', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          category: billForm.category,
-          provider: billForm.provider,
-          consumerNumber: billForm.consumerNumber,
-          amount: parseFloat(billForm.amount)
-        })
-      });
-      
-      const data = await response.json();
-      
-      if (data.success) {
-        if (data.data.status === 'Success') {
-          setSuccess(`Bill payment of ₹${billForm.amount} completed successfully!`);
-        } else {
-          setError(`Bill payment failed. Please try again.`);
-        }
-        setBillForm({
-          category: activeCategory,
-          provider: '',
-          consumerNumber: '',
-          amount: ''
-        });
-        fetchBillHistory();
+  const handlePay = async (e) => {
+    e.preventDefault(); setLoading(true); setError(''); setSuccess('');
+    const data = await apiPost('/api/BillPayment/pay', {
+      category: activeCat,
+      provider: form.provider,
+      consumerNumber: form.consumerNumber,
+      amount: parseFloat(form.amount)
+    });
+    if (data.success) {
+      const status = data.data?.status;
+      if (status === 'Success') {
+        setSuccess(`✅ Bill payment of ₹${form.amount} to ${form.provider} completed!`);
+        setForm({ provider: '', consumerNumber: '', amount: '' });
+        fetchHistory();
       } else {
-        setError(data.message);
+        setError('Bill payment failed. Please try again.');
       }
-    } catch (err) {
-      setError('Failed to process bill payment');
-    } finally {
-      setLoading(false);
-    }
+    } else setError(data.message || 'Payment failed');
+    setLoading(false);
   };
 
-  const currentCategory = billCategories.find(cat => cat.id === activeCategory);
+  const currentCat = CATEGORIES.find(c => c.id === activeCat);
 
   return (
     <div className="page-container">
       <div className="page-header">
-        <h1 className="page-title">Bill Payments</h1>
-        <p className="page-subtitle">Pay utility bills instantly from your wallet</p>
+        <div>
+          <h1 className="page-title">Bill Payments</h1>
+          <p className="page-subtitle">Pay utility bills instantly from your wallet</p>
+        </div>
       </div>
 
-      {error && (
-        <div className="alert alert-error">
-          <span>❌</span>
-          <span>{error}</span>
-        </div>
-      )}
-
-      {success && (
-        <div className="alert alert-success">
-          <span>✅</span>
-          <span>{success}</span>
-        </div>
-      )}
+      {error && <div className="alert alert-error">❌ {error}</div>}
+      {success && <div className="alert alert-success">{success}</div>}
 
       <div className="bill-payment-layout">
-        {/* Categories Sidebar */}
         <div className="categories-sidebar">
           <h3>Bill Categories</h3>
           <div className="categories-list">
-            {billCategories.map((category) => (
-              <button
-                key={category.id}
-                className={`category-item ${activeCategory === category.id ? 'active' : ''}`}
-                onClick={() => setActiveCategory(category.id)}
-              >
-                <span className="category-icon">{category.icon}</span>
-                <span className="category-name">{category.name}</span>
+            {CATEGORIES.map(cat => (
+              <button key={cat.id} className={`category-item${activeCat===cat.id?' active':''}`} onClick={() => setActiveCat(cat.id)}>
+                <span>{cat.icon}</span>
+                <span>{cat.name}</span>
               </button>
             ))}
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="bill-content">
           <div className="card">
             <div className="card-header">
-              <h3 className="card-title">
-                {currentCategory?.icon} Pay {currentCategory?.name} Bill
-              </h3>
+              <h3 className="card-title">{currentCat?.icon} Pay {currentCat?.name} Bill</h3>
             </div>
-            <form onSubmit={handlePayBill} className="card-content">
+            <form onSubmit={handlePay} className="card-content">
               <div className="form-grid">
                 <div className="form-group">
                   <label>Service Provider *</label>
-                  <select
-                    value={billForm.provider}
-                    onChange={(e) => setBillForm({...billForm, provider: e.target.value})}
-                    required
-                  >
+                  <select value={form.provider} onChange={e => setForm({...form, provider: e.target.value})} required>
                     <option value="">Select Provider</option>
-                    {currentCategory?.providers.map((provider) => (
-                      <option key={provider} value={provider}>
-                        {provider}
-                      </option>
-                    ))}
+                    {currentCat?.providers.map(p => <option key={p} value={p}>{p}</option>)}
                   </select>
                 </div>
                 <div className="form-group">
-                  <label>Consumer/Account Number *</label>
-                  <input
-                    type="text"
-                    value={billForm.consumerNumber}
-                    onChange={(e) => setBillForm({...billForm, consumerNumber: e.target.value})}
-                    placeholder="Enter your consumer number"
-                    required
-                  />
+                  <label>Consumer / Account Number *</label>
+                  <input type="text" value={form.consumerNumber} onChange={e => setForm({...form, consumerNumber: e.target.value})} placeholder="Enter your consumer number" required />
                 </div>
                 <div className="form-group">
                   <label>Amount (₹) *</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    min="1"
-                    value={billForm.amount}
-                    onChange={(e) => setBillForm({...billForm, amount: e.target.value})}
-                    placeholder="Enter bill amount"
-                    required
-                  />
+                  <input type="number" step="0.01" min="1" value={form.amount} onChange={e => setForm({...form, amount: e.target.value})} placeholder="Enter bill amount" required />
                 </div>
               </div>
               <div className="form-actions">
                 <button type="submit" className="btn btn-primary" disabled={loading}>
-                  {loading ? 'Processing...' : `Pay ₹${billForm.amount || '0'}`}
+                  {loading ? 'Processing…' : `Pay ₹${form.amount || '0'}`}
                 </button>
               </div>
             </form>
           </div>
 
-          {/* Quick Bill Info */}
           <div className="card">
-            <div className="card-header">
-              <h3 className="card-title">💡 Bill Payment Tips</h3>
-            </div>
+            <div className="card-header"><h3 className="card-title">💡 Tips</h3></div>
             <div className="card-content">
               <div className="tips-grid">
-                <div className="tip-item">
-                  <strong>Consumer Number:</strong> Find this on your bill statement or previous payment receipts.
-                </div>
-                <div className="tip-item">
-                  <strong>Amount Verification:</strong> Double-check the amount before confirming payment.
-                </div>
-                <div className="tip-item">
-                  <strong>Payment Time:</strong> Bills are usually processed instantly, but may take up to 24 hours to reflect.
-                </div>
-                <div className="tip-item">
-                  <strong>Receipt:</strong> Keep the transaction reference for your records.
-                </div>
+                {[['Consumer Number','Find this on your bill statement or at the service provider\'s website.'],['Verify Amount','Double-check the amount before confirming.'],['Processing Time','Bills are usually updated within 24 hours.'],['Keep Reference','Save the transaction reference number.']].map(([title,desc]) => (
+                  <div key={title} className="tip-item"><strong style={{color:'var(--text-1)'}}>{title}:</strong> <span style={{color:'var(--text-2)'}}>{desc}</span></div>
+                ))}
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Recent Bill Payments */}
-      <div className="card mt-6">
-        <div className="card-header">
-          <h3 className="card-title">Recent Bill Payments</h3>
-        </div>
+      <div className="card" style={{marginTop:'1.5rem'}}>
+        <div className="card-header"><h3 className="card-title">Recent Bill Payments</h3></div>
         <div className="card-content">
-          {billHistory.length === 0 ? (
-            <div className="empty-state">
-              <div className="empty-state-icon">💡</div>
-              <h3>No Bill Payments Yet</h3>
-              <p>Your bill payment history will appear here</p>
-            </div>
+          {history.length === 0 ? (
+            <div className="empty-state"><div className="empty-state-icon">💡</div><h3>No Bill Payments Yet</h3><p>Your payment history will appear here</p></div>
           ) : (
-            <div className="history-table">
-              <div className="table-header">
-                <div>Bill Type</div>
-                <div>Provider</div>
-                <div>Consumer No.</div>
-                <div>Amount</div>
-                <div>Status</div>
-                <div>Date</div>
-              </div>
-              {billHistory.map((bill) => (
-                <div key={bill.id} className="table-row">
-                  <div className="bill-category">
-                    {billCategories.find(c => c.id === bill.category)?.icon} {bill.category}
-                  </div>
-                  <div>{bill.provider}</div>
-                  <div className="consumer-number">
-                    ****{bill.consumerNumber.slice(-4)}
-                  </div>
-                  <div className="amount">₹{bill.amount}</div>
-                  <div>
-                    <span className={`status ${bill.status.toLowerCase()}`}>
-                      {bill.status === 'Success' ? '✅' : 
-                       bill.status === 'Failed' ? '❌' : 
-                       bill.status === 'Pending' ? '⏳' : '❓'} 
-                      {bill.status}
-                    </span>
-                  </div>
-                  <div className="date">
-                    {new Date(bill.createdAt).toLocaleDateString()}
-                  </div>
-                </div>
-              ))}
+            <div className="table-wrap">
+              <table>
+                <thead><tr><th>Category</th><th>Provider</th><th>Consumer No.</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
+                <tbody>
+                  {history.map(bill => (
+                    <tr key={bill.id}>
+                      <td>{CATEGORIES.find(c=>c.id===bill.category)?.icon} {bill.category}</td>
+                      <td>{bill.provider}</td>
+                      <td className="mono">****{bill.consumerNumber?.slice(-4)}</td>
+                      <td><strong>₹{bill.amount}</strong></td>
+                      <td><span className={`badge ${bill.status==='Success'?'badge-success':bill.status==='Failed'?'badge-danger':'badge-warning'}`}>{bill.status}</span></td>
+                      <td className="text-sm">{new Date(bill.createdAt).toLocaleDateString('en-IN')}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           )}
         </div>
